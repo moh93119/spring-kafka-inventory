@@ -1,0 +1,67 @@
+# Assumes Postgres, Redis and Kafka already exist in-cluster (e.g. via
+# Bitnami Helm charts) reachable as "postgres", "redis" and "kafka" - not
+# included here, same as any real deployment wouldn't reinvent those.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: inventory-service-config
+data:
+  DB_HOST: postgres
+  DB_NAME: inventory
+  DB_USER: inventory
+  DB_PASSWORD: inventory
+  REDIS_HOST: redis
+  KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: inventory-service
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: inventory-service
+  template:
+    metadata:
+      labels:
+        app: inventory-service
+    spec:
+      terminationGracePeriodSeconds: 30
+      containers:
+        - name: inventory-service
+          image: mohsen/inventory-service:latest
+          ports:
+            - containerPort: 8081
+          envFrom:
+            - configMapRef:
+                name: inventory-service-config
+          resources:
+            requests:
+              cpu: 250m
+              memory: 384Mi
+            limits:
+              memory: 512Mi
+          readinessProbe:
+            httpGet:
+              path: /actuator/health/readiness
+              port: 8081
+            initialDelaySeconds: 15
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /actuator/health/liveness
+              port: 8081
+            initialDelaySeconds: 30
+            periodSeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: inventory-service
+spec:
+  selector:
+    app: inventory-service
+  ports:
+    - port: 8081
+      targetPort: 8081

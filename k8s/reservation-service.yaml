@@ -1,0 +1,63 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: reservation-service-config
+data:
+  DB_HOST: postgres
+  DB_NAME: reservation
+  DB_USER: reservation
+  DB_PASSWORD: reservation
+  KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: reservation-service
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: reservation-service
+  template:
+    metadata:
+      labels:
+        app: reservation-service
+    spec:
+      terminationGracePeriodSeconds: 30
+      containers:
+        - name: reservation-service
+          image: mohsen/reservation-service:latest
+          ports:
+            - containerPort: 8082
+          envFrom:
+            - configMapRef:
+                name: reservation-service-config
+          resources:
+            requests:
+              cpu: 250m
+              memory: 384Mi
+            limits:
+              memory: 512Mi
+          readinessProbe:
+            httpGet:
+              path: /actuator/health/readiness
+              port: 8082
+            initialDelaySeconds: 15
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /actuator/health/liveness
+              port: 8082
+            initialDelaySeconds: 30
+            periodSeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: reservation-service
+spec:
+  selector:
+    app: reservation-service
+  ports:
+    - port: 8082
+      targetPort: 8082

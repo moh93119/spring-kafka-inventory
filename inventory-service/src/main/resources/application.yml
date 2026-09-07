@@ -1,0 +1,91 @@
+server:
+  port: 8081
+
+spring:
+  application:
+    name: inventory-service
+
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:inventory}
+    username: ${DB_USER:inventory}
+    password: ${DB_PASSWORD:inventory}
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 2
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      # The outbox already stores each event pre-serialized as a JSON
+      # string (OutboxWriter/ObjectMapper) - StringSerializer sends those
+      # bytes as-is. Using JsonSerializer here would re-encode an already-
+      # JSON string as a quoted JSON string literal, corrupting the payload.
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+      acks: all
+    consumer:
+      group-id: inventory-service
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.ErrorHandlingDeserializer
+      auto-offset-reset: earliest
+      properties:
+        spring.deserializer.value.delegate.class: org.springframework.kafka.support.serializer.JsonDeserializer
+        # Never "*" - only trust the packages this service actually expects
+        # to deserialize, the Kafka equivalent of the Jackson2JsonMessageConverter
+        # trusted-package warning on the RabbitMQ side.
+        spring.json.trusted.packages: com.mohsen.inventory.events
+        spring.json.use.type.headers: false
+        spring.json.value.default.type: com.mohsen.inventory.events.ReservationRequestedEvent
+
+app:
+  kafka:
+    topics:
+      reservation-requests: reservation-requests
+      inventory-events: inventory-events
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+  health:
+    livenessstate:
+      enabled: true
+    readinessstate:
+      enabled: true
+
+resilience4j:
+  retry:
+    instances:
+      stockCache:
+        max-attempts: 3
+        wait-duration: 100ms
+  circuitbreaker:
+    instances:
+      stockCache:
+        sliding-window-size: 10
+        failure-rate-threshold: 50
+        wait-duration-in-open-state: 5s
+        permitted-number-of-calls-in-half-open-state: 3
+
+logging:
+  level:
+    com.mohsen.inventory: INFO

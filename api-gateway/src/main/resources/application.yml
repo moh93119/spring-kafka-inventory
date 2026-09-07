@@ -1,0 +1,64 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: api-gateway
+
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+
+  cloud:
+    gateway:
+      routes:
+        - id: stock-route
+          uri: ${INVENTORY_SERVICE_URI:http://localhost:8081}
+          predicates:
+            - Path=/api/stock/**
+          filters:
+            - name: CircuitBreaker
+              args:
+                name: stockCB
+                fallbackUri: forward:/fallback/stock
+            - name: RequestRateLimiter
+              args:
+                redis-rate-limiter.replenishRate: 20
+                redis-rate-limiter.burstCapacity: 40
+                key-resolver: "#{@ipKeyResolver}"
+
+        - id: reservations-route
+          uri: ${RESERVATION_SERVICE_URI:http://localhost:8082}
+          predicates:
+            - Path=/api/reservations/**
+          filters:
+            - name: CircuitBreaker
+              args:
+                name: reservationCB
+                fallbackUri: forward:/fallback/reservations
+            - name: RequestRateLimiter
+              args:
+                redis-rate-limiter.replenishRate: 20
+                redis-rate-limiter.burstCapacity: 40
+                key-resolver: "#{@ipKeyResolver}"
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus,gateway
+  endpoint:
+    health:
+      probes:
+        enabled: true
+  health:
+    livenessstate:
+      enabled: true
+    readinessstate:
+      enabled: true
+
+logging:
+  level:
+    com.mohsen.gateway: INFO
+    org.springframework.cloud.gateway: INFO

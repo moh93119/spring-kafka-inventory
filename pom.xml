@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>com.mohsen</groupId>
+    <artifactId>spring-kafka-inventory</artifactId>
+    <version>0.0.1-SNAPSHOT</version>
+    <packaging>pom</packaging>
+
+    <name>Distributed Inventory System</name>
+    <description>
+        Two Spring Boot services choreographed over Kafka (transactional
+        outbox, idempotent consumers, dead-letter topics), fronted by a
+        Spring Cloud Gateway, with Redis caching and Resilience4j - the
+        Kafka/broker counterpart to the outbox pattern built in the
+        companion dotnet-to-spring-orders repo.
+    </description>
+
+    <!--
+        Deliberately NOT a <parent> for the modules - each module keeps
+        spring-boot-starter-parent as its own parent directly. This is a
+        pure reactor aggregator so `./mvnw verify` builds all three, while
+        each module stays independently buildable/deployable.
+    -->
+    <modules>
+        <module>inventory-service</module>
+        <module>reservation-service</module>
+        <module>api-gateway</module>
+    </modules>
+
+</project>
